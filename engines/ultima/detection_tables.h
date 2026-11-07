@@ -394,6 +394,24 @@ static const UltimaGameDescription GAME_DESCRIPTIONS[] = {
 		0
 	},
 
+	// Unofficial Japanese fan translation (ultima-ja), built from the English version.
+	// The files change with every translation update, so no MD5 or size is checked.
+	{
+		{
+			"ultima8",
+			"Unofficial Japanese",
+			AD_ENTRY3s("usecode/jusecode.flx", nullptr, AD_NO_SIZE,
+					   "static/u8shapes.flx", nullptr, AD_NO_SIZE,
+					   "static/u8fonts.flx", nullptr, AD_NO_SIZE),
+			Common::JA_JPN,
+			Common::kPlatformDOS,
+			ADGF_NO_FLAGS,
+			GUI_OPTIONS_ULTIMA8
+		},
+		GAME_ULTIMA8,
+		0
+	},
+
 	// Crusader games use a very similar engine to ultima8.
 	// complete.  Because each version requires a separate Usecode callback
 	// table, only fully patched versions are marked supported.
