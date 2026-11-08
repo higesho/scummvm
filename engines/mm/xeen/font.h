@@ -43,6 +43,9 @@ struct FontData {
 	static bool _fontReduced;
 	static Justify _fontJustify;
 	static Graphics::Big5Font *_big5Font;
+	// Unofficial Japanese translation: 8x8 glyphs of JIS X 0208, 94 x 94
+	// cells of 8 bytes (one byte per row, high bit on the left)
+	static const byte *_jaFont;
 };
 
 class FontSurface: public Shared::Xeen::XSurface, public FontData {
@@ -50,6 +53,7 @@ private:
 	const char *_displayString;
 	bool _msgWraps;
 	bool _isBig5;
+	bool _isSjis;
 
 	Common::Language lang;
 	/**
@@ -75,6 +79,14 @@ private:
 	bool getNextCharWidth(int &total);
 
 	/**
+	 * Japanese: finds where to break a line that overflows at the character
+	 * starting at overP, following the Japanese line breaking rules
+	 * @param starts	Start of each character measured on the line
+	 * @returns			Start of the first character of the next line
+	 */
+	const char *findSjisBreak(const Common::Array<const char *> &starts, const char *overP);
+
+	/**
 	 * Handles moving to the next line of the given bounded area
 	 */
 	bool newLine(const Common::Rect &bounds);
@@ -93,6 +105,11 @@ private:
 	 * Wrie a character to the surface
 	 */
 	void writeChar(uint16_t c, const Common::Rect &clipRect);
+
+	/**
+	 * Japanese: writes a Shift-JIS character from the 8x8 font
+	 */
+	void writeSjisChar(uint16_t c, const Common::Rect &clipRect);
 public:
 	Common::Point &_writePos;
 public:

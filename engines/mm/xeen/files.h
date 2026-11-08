@@ -72,8 +72,18 @@ public:
 	SaveArchive *_xeenSave = nullptr, *_darkSave = nullptr;
 	BaseCCArchive *_currentArchive = nullptr;
 	SaveArchive *_currentSave = nullptr;
+	// Unofficial Japanese translation (xeen_ja.dat): replacement text files
+	// stored as xeen/<name>, dark/<name> and intro/<name>
+	Common::Archive *_jaArchive = nullptr;
 
 public:
+	/**
+	 * Returns the path of a replacement file for the current archive in
+	 * the Japanese translation, or an empty path if there is none.
+	 * With intro set, looks for a replacement of a file from intro.cc
+	 */
+	Common::Path getJaPath(const Common::Path &filename, bool intro = false) const;
+
 	/**
 	 * Constructor
 	 */

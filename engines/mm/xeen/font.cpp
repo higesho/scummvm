@@ -39,6 +39,7 @@ byte FontData::_bgColor;
 bool FontData::_fontReduced;
 Justify FontData::_fontJustify;
 Graphics::Big5Font *FontData::_big5Font;
+const byte *FontData::_jaFont;
 	
 FontSurface::FontSurface() : XSurface(), _msgWraps(false), _displayString(nullptr),
 		_writePos(*FontData::_fontWritePos) {
@@ -61,6 +62,7 @@ FontSurface::FontSurface() : XSurface(), _msgWraps(false), _displayString(nullpt
 		_fntEnReducedWOffset    = 0x1080;
 	}
 	_isBig5 = Common::ZH_TWN == lang;
+	_isSjis = Common::JA_JPN == lang;
 }
 
 FontSurface::FontSurface(int wv, int hv) : XSurface(wv, hv),
@@ -85,6 +87,7 @@ FontSurface::FontSurface(int wv, int hv) : XSurface(wv, hv),
 		_fntEnReducedWOffset    = 0x1080;
 	}
 	_isBig5 = Common::ZH_TWN == lang;
+	_isSjis = Common::JA_JPN == lang;
 }
 
 void FontSurface::writeSymbol(int symbolId) {
@@ -104,7 +107,7 @@ void FontSurface::writeSymbol(int symbolId) {
 }
 
 bool FontSurface::isSpace(char c) {
-	if (Common::RU_RUS == lang) 
+	if (Common::RU_RUS == lang || _isSjis)
 		return c == ' ';
 	return (c & 0x7f) == ' ';
 }
@@ -127,11 +130,30 @@ const char *FontSurface::writeString(const Common::String &s, const Common::Rect
 
 		// Get the size of the string that can be displayed on the line
 		int xp = _fontJustify == JUSTIFY_CENTER ? bounds.left : _writePos.x;
-		while (!getNextCharWidth(xp)) {
-			if (xp >= bounds.right) {
-				--_displayString;
-				_msgWraps = true;
-				break;
+		Common::Array<const char *> sjisStarts;
+		const char *sjisOverP = nullptr;
+		if (_isSjis) {
+			// Japanese: remember where each character starts, so the line
+			// can be broken between any two characters
+			for (;;) {
+				const char *charP = _displayString;
+				if (getNextCharWidth(xp))
+					break;
+				if (xp >= bounds.right) {
+					_displayString = charP;
+					sjisOverP = charP;
+					_msgWraps = true;
+					break;
+				}
+				sjisStarts.push_back(charP);
+			}
+		} else {
+			while (!getNextCharWidth(xp)) {
+				if (xp >= bounds.right) {
+					--_displayString;
+					_msgWraps = true;
+					break;
+				}
 			}
 		}
 
@@ -139,7 +161,25 @@ const char *FontSurface::writeString(const Common::String &s, const Common::Rect
 		const char *displayEnd = _displayString;
 		_displayString = msgStartP;
 
-		if (_msgWraps && _fontJustify != JUSTIFY_RIGHT && xp >= bounds.right) {
+		if (_isSjis && _msgWraps && _fontJustify != JUSTIFY_RIGHT) {
+			const char *nextP = findSjisBreak(sjisStarts, sjisOverP);
+			if (nextP == msgStartP) {
+				// Not even one character fits
+				if (_fontJustify == JUSTIFY_NONE && _writePos.x != bounds.left) {
+					// Move to the next line
+					if (!newLine(bounds))
+						continue;
+					// Ran out of space to display string
+					break;
+				}
+				// Display the character anyway rather than looping forever
+				_displayString = sjisOverP;
+				getNextChar();
+				nextP = _displayString;
+				_displayString = msgStartP;
+			}
+			displayEnd = nextP - 1;
+		} else if (_msgWraps && _fontJustify != JUSTIFY_RIGHT && xp >= bounds.right) {
 			// Need to handle justification of text
 			// First, move backwards to find the end of the previous word
 			// for a convenient point to break the line at
@@ -381,7 +421,7 @@ const char *FontSurface::fitToWidth(const char *s, int maxWidth) {
 void FontSurface::writeCharacter(uint16_t c, const Common::Rect &clipRect) {
 	Justify justify = _fontJustify;
 	_fontJustify = JUSTIFY_NONE;
-	if (_isBig5 && c >= 0x100)
+	if ((_isBig5 || _isSjis) && c >= 0x100)
 		writeString(Common::String::format("%c%c", c >> 8, c & 0xff), clipRect);
 	else
 		writeString(Common::String::format("%c", c), clipRect);
@@ -415,7 +455,12 @@ static uint16_t frenchChar(byte c) {
 }
 
 uint16_t FontSurface::getNextChar() {
-	if (_isBig5) {
+	if (_isSjis) {
+		byte lead = (byte)*_displayString++;
+		if (((lead >= 0x81 && lead <= 0x9F) || (lead >= 0xE0 && lead <= 0xFC)) && *_displayString)
+			return (lead << 8) | ((byte)*_displayString++);
+		return lead & 0x7f;
+	} else if (_isBig5) {
 		uint8_t lead = *_displayString++;
 		if (!(lead & 0x80))
 			return lead;
@@ -433,6 +478,9 @@ bool FontSurface::getNextCharWidth(int &total) {
 
 	if (_isBig5 && c > 0xff) {
 		total += kBig5Width;
+		return false;
+	} else if (_isSjis && c > 0xff) {
+		total += FONT_WIDTH;
 		return false;
 	} if (c > ' ') {
 		total += _fontData[(_fontReduced ? _fntEnReducedWOffset : _fntEnWOffset) + (int)c];
@@ -499,6 +547,136 @@ void FontSurface::setTextColor(int idx) {
 	Common::copy(colP, colP + 4, &_textColors[0]);
 }
 
+/**
+ * Converts a Shift-JIS code to the cell number of JIS X 0208, or -1
+ */
+static int sjisToCell(uint16_t c) {
+	int hi = c >> 8, lo = c & 0xff;
+	if (hi >= 0xE0)
+		hi -= 0x40;
+	int row = (hi - 0x81) * 2, col;
+	if (lo >= 0x9F) {
+		++row;
+		col = lo - 0x9F;
+	} else {
+		col = lo - 0x40;
+		if (lo >= 0x80)
+			--col;
+	}
+	if (row < 0 || row >= 94 || col < 0 || col >= 94)
+		return -1;
+	return row * 94 + col;
+}
+
+static uint16_t sjisCharAt(const char *p) {
+	byte lead = (byte)p[0];
+	if (((lead >= 0x81 && lead <= 0x9F) || (lead >= 0xE0 && lead <= 0xFC)) && p[1])
+		return (lead << 8) | (byte)p[1];
+	return lead & 0x7f;
+}
+
+// Characters that may not start a line
+static bool sjisNoLineStart(uint16_t c) {
+	static const char *const ASCII = ".,!?:;)]}'\"%";
+	if (c < 0x80)
+		return c && strchr(ASCII, c) != nullptr;
+	static const uint16_t CHARS[] = {
+		0x8141, 0x8142, 0x8143, 0x8144, 0x8145, 0x8146, 0x8147, 0x8148, 0x8149,
+		0x814A, 0x814B, 0x8152, 0x8153, 0x8154, 0x8155, 0x8158, 0x815B,	
+		0x815C, 0x815D, 0x8160, 0x8163, 0x8164,								
+		0x8166, 0x8168, 0x816A, 0x816C, 0x816E, 0x8170, 0x8172, 0x8174, 0x8176,
+		0x8178, 0x817A, 0x818B, 0x818C, 0x818D, 0x818E, 0x8193,				
+		0x829F, 0x82A1, 0x82A3, 0x82A5, 0x82A7, 0x82C1, 0x82E1, 0x82E3, 0x82E5, 0x82EC,
+		0x8340, 0x8342, 0x8344, 0x8346, 0x8348, 0x8362, 0x8383, 0x8385, 0x8387, 0x838E,
+		0x8395, 0x8396, 0												
+	};
+	for (const uint16_t *p = CHARS; *p; ++p) {
+		if (*p == c)
+			return true;
+	}
+	return false;
+}
+
+// Characters that may not end a line
+static bool sjisNoLineEnd(uint16_t c) {
+	if (c < 0x80)
+		return c == '(' || c == '[' || c == '{';
+	static const uint16_t CHARS[] = {
+		0x8165, 0x8167, 0x8169, 0x816B, 0x816D, 0x816F, 0x8171, 0x8173, 0x8175,
+		0x8177, 0x8179, 0												
+	};
+	for (const uint16_t *p = CHARS; *p; ++p) {
+		if (*p == c)
+			return true;
+	}
+	return false;
+}
+
+static bool sjisIsWordChar(uint16_t c) {
+	return c < 0x80 && (Common::isAlnum(c) || c == '-' || c == '\'');
+}
+
+const char *FontSurface::findSjisBreak(const Common::Array<const char *> &starts, const char *overP) {
+	// all[i] is the start of the i-th character; the line is broken before
+	// all[idx], so all[0] .. all[idx - 1] stay on this line
+	Common::Array<const char *> all = starts;
+	all.push_back(overP);
+	int idx = (int)all.size() - 1;
+	if (idx == 0)
+		return all[0];
+
+	// Keep English words (names, passwords) in one piece when possible
+	if (sjisIsWordChar(sjisCharAt(all[idx])) && sjisIsWordChar(sjisCharAt(all[idx - 1]))) {
+		int wordIdx = idx;
+		while (wordIdx > 0 && sjisIsWordChar(sjisCharAt(all[wordIdx - 1])))
+			--wordIdx;
+		if (wordIdx > 0)
+			return all[wordIdx];
+	}
+
+	// A space can start the next line, since newLine skips it
+	if (sjisCharAt(all[idx]) == ' ')
+		return all[idx];
+
+	// Push the previous characters down rather than starting a line with
+	// a closing bracket or punctuation, and don't end a line with an
+	// opening bracket
+	for (int tries = 0; tries < 3 && idx > 1; ++tries) {
+		if (sjisNoLineStart(sjisCharAt(all[idx])) || sjisNoLineEnd(sjisCharAt(all[idx - 1])))
+			--idx;
+		else
+			break;
+	}
+
+	return all[idx];
+}
+
+void FontSurface::writeSjisChar(uint16_t c, const Common::Rect &clipRect) {
+	int cell = sjisToCell(c);
+	if (_jaFont && cell >= 0) {
+		const byte *srcP = _jaFont + cell * FONT_HEIGHT;
+		for (int yp = 0; yp < FONT_HEIGHT; ++yp) {
+			int y = _writePos.y + yp;
+			if (y < clipRect.top || y >= clipRect.bottom)
+				continue;
+
+			byte bits = srcP[yp];
+			byte *destP = (byte *)getBasePtr(_writePos.x, y);
+			const byte *lineStart = (const byte *)getBasePtr(clipRect.left, y);
+			const byte *lineEnd = (const byte *)getBasePtr(clipRect.right, y);
+
+			for (int xp = 0; xp < FONT_WIDTH; ++xp, ++destP) {
+				if ((bits & (0x80 >> xp)) && destP >= lineStart && destP < lineEnd)
+					*destP = _textColors[2];
+			}
+		}
+	}
+
+	addDirtyRect(Common::Rect(_writePos.x, _writePos.y, _writePos.x + FONT_WIDTH,
+		_writePos.y + FONT_HEIGHT));
+	_writePos.x += FONT_WIDTH;
+}
+
 void FontSurface::writeChar(uint16_t c, const Common::Rect &clipRect) {
 	// Get y position, handling kerning
 	int y = _writePos.y;
@@ -510,6 +688,10 @@ void FontSurface::writeChar(uint16_t c, const Common::Rect &clipRect) {
 		addDirtyRect(Common::Rect(_writePos.x, _writePos.y, _writePos.x + kBig5Width,
 					  _writePos.y + kBig5Height));
 
+		return;
+	}
+	if (_isSjis && c > 0xff) {
+		writeSjisChar(c, clipRect);
 		return;
 	}
 	if (c == 'g' || c == 'p' || c == 'q' || c == 'y')

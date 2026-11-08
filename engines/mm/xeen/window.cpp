@@ -31,6 +31,7 @@ Windows::Windows() {
 	byte *data = new byte[f.size()];
 	f.read(data, f.size());
 	_fontData = data;
+	_jaFont = nullptr;
 	_fontWritePos = new Common::Point();
 
 	Common::fill(&_textColors[0], &_textColors[4], 0);
@@ -94,12 +95,22 @@ Windows::Windows() {
 		_big5Font->loadPrefixedRaw(pat, 15);
 	} else if (g_vm->getLanguage() == Common::ZH_TWN) {
 		error("Unable to find TEXTPAT.FNT or CMM4.PAT for Chinese version");
+	}
+
+	if (g_vm->getLanguage() == Common::JA_JPN) {
+		// Unofficial Japanese translation: 8x8 font in xeen_ja.dat
+		File fj("font_ja.bin");
+		byte *jaData = new byte[fj.size()];
+		fj.read(jaData, fj.size());
+		_jaFont = jaData;
 	}	
 
 }
 
 Windows::~Windows() {
 	delete[] _fontData;
+	delete[] _jaFont;
+	_jaFont = nullptr;
 	delete _fontWritePos;
 }
 

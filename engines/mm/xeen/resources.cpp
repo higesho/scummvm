@@ -71,6 +71,11 @@ void Resources::loadData() {
 	case Common::RU_RUS:
 		langId = 26;
 		break;
+	case Common::JA_JPN:
+		// Unofficial Japanese translation: CONSTANTS_21 and CONSTKEYS_21
+		// are in xeen_ja.dat
+		langId = 21;
+		break;
 	default:
 		// English
 		langId = 7;

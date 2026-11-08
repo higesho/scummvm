@@ -21,6 +21,7 @@
 
 #include "common/scummsys.h"
 #include "common/archive.h"
+#include "common/compression/unzip.h"
 #include "common/engine_data.h"
 #include "common/memstream.h"
 #include "common/substream.h"
@@ -43,6 +44,8 @@ FileManager::FileManager(XeenEngine *vm) {
 FileManager::~FileManager() {
 	SearchMan.remove("intro");
 	SearchMan.remove("data");
+	SearchMan.remove("xeen_ja");
+	_jaArchive = nullptr;
 	delete _xeenCc;
 	delete _darkCc;
 }
@@ -61,6 +64,18 @@ bool FileManager::setup() {
 	if (Common::File::exists("intro.cc")) {
 		_introCc = new CCArchive("intro.cc", "intro", true);
 		SearchMan.add("intro", _introCc);
+	}
+
+	if (g_vm->getLanguage() == Common::JA_JPN) {
+		// The Japanese translation keeps the original CC files untouched and
+		// adds the translated text, the font and the constants in a zip file.
+		// Files at its top level (constants, font) are found through SearchMan
+		_jaArchive = Common::makeZipArchive("xeen_ja.dat");
+		if (!_jaArchive) {
+			GUIErrorMessage(Common::U32String("Could not open xeen_ja.dat"));
+			return false;
+		}
+		SearchMan.add("xeen_ja", _jaArchive, 50, true);
 	}
 
 	_currentArchive = g_vm->getGameID() == GType_DarkSide || g_vm->getGameID() == GType_Swords ?
@@ -85,6 +100,28 @@ void FileManager::setGameCc(int ccMode) {
 
 	File::setCurrentArchive(ccMode);
 	_ccNum = ccMode != 0;
+}
+
+Common::Path FileManager::getJaPath(const Common::Path &filename, bool intro) const {
+	if (!_jaArchive || filename.empty())
+		return Common::Path();
+
+	const char *prefix;
+	if (intro)
+		prefix = "intro/";
+	else if (_currentArchive && _currentArchive == _xeenCc)
+		prefix = "xeen/";
+	else if (_currentArchive && _currentArchive == _darkCc)
+		prefix = "dark/";
+	else
+		prefix = "intro/";
+
+	// The replacements are stored by resource id, like in the CC files
+	uint16 id = BaseCCArchive::convertNameToId(filename);
+	if (id == 0xffff)
+		return Common::Path();
+	Common::Path jaPath(Common::String::format("%s%04x", prefix, id));
+	return _jaArchive->hasFile(jaPath) ? jaPath : Common::Path();
 }
 
 void FileManager::load(Common::SeekableReadStream &stream) {

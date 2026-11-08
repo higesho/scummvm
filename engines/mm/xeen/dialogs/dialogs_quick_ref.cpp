@@ -58,6 +58,29 @@ const char *QuickReferenceDialog::getDaysPlurals(int val) {
 	}
 }
 
+/**
+ * Returns the idx-th of count bytes that abbreviate the given name. In the
+ * Japanese translation only whole Shift-JIS characters are used, and the
+ * remaining bytes are code 5, which the font code skips
+ */
+static char abbrevChar(const char *name, int idx, int count) {
+	if (g_vm->getLanguage() != Common::JA_JPN)
+		return name[idx];
+
+	int used = 0;
+	for (const byte *p = (const byte *)name; *p; ) {
+		int len = ((*p >= 0x81 && *p <= 0x9F) || (*p >= 0xE0 && *p <= 0xFC)) && p[1] ? 2 : 1;
+		if (used + len > count)
+			break;
+		if (idx < used + len)
+			return (char)p[idx - used];
+		used += len;
+		p += len;
+	}
+
+	return 5;
+}
+
 void QuickReferenceDialog::execute() {
 	Combat &combat = *_vm->_combat;
 	EventsManager &events = *_vm->_events;
@@ -75,14 +98,15 @@ void QuickReferenceDialog::execute() {
 		Condition condition = c.worstCondition();
 		lines[idx] = Common::String::format(Res.QUICK_REF_LINE,
 			idx * 10 + 24, idx + 1, c._name.c_str(),
-			Res.CLASS_NAMES[c._class][0], Res.CLASS_NAMES[c._class][1], Res.CLASS_NAMES[c._class][2],
+			abbrevChar(Res.CLASS_NAMES[c._class], 0, 3), abbrevChar(Res.CLASS_NAMES[c._class], 1, 3),
+			abbrevChar(Res.CLASS_NAMES[c._class], 2, 3),
 			c.statColor(c.getCurrentLevel(), c._level._permanent), c._level._permanent,
 			c.statColor(c._currentHp, c.getMaxHP()), c._currentHp,
 			c.statColor(c._currentSp, c.getMaxSP()), c._currentSp,
 			c.statColor(c.getArmorClass(), c.getArmorClass(true)), c.getArmorClass(),
 			Res.CONDITION_COLORS[condition],
-			tmpConditions[condition][0], tmpConditions[condition][1],
-			tmpConditions[condition][2], tmpConditions[condition][3]
+			abbrevChar(tmpConditions[condition], 0, 4), abbrevChar(tmpConditions[condition], 1, 4),
+			abbrevChar(tmpConditions[condition], 2, 4), abbrevChar(tmpConditions[condition], 3, 4)
 		);
 	}
 

@@ -285,6 +285,9 @@ bool InventoryItems::isFull() const {
 }
 
 void InventoryItems::capitalizeItem(Common::String &name) {
+	// Japanese has no capital letters, and the bytes may be Shift-JIS
+	if (g_vm->getLanguage() == Common::JA_JPN)
+		return;
 	if (name[3] == '\f')
 		name.setChar(toupper(name[6]), 6);
 	else

@@ -90,6 +90,25 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 		0
 	},
 
+	// Unofficial Japanese fan translation (mm-ja), added on top of the GOG English
+	// version. The translated text, font and constants live in xeen_ja.dat, which
+	// changes with every translation update, so only the original files are checked.
+	{
+		{
+			"worldofxeen",
+			"Unofficial Japanese",
+			AD_ENTRY3s("xeen.cc", "0cffbab533d9afe140e69ec93096f43e", 13435646,
+					   "dark.cc", "df194483ecea6abc0511637d712ced7c", 11217676,
+					   "xeen_ja.dat", nullptr, AD_NO_SIZE),
+			Common::JA_JPN,
+			Common::kPlatformDOS,
+			ADGF_NO_FLAGS,
+			GUIO_XEEN
+		},
+		GType_WorldOfXeen,
+		0
+	},
+
 	{
 		// World of Xeen (Monster Spawn Mod v1.0), Bugreport #12714
 		{

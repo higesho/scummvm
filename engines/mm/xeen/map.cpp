@@ -144,6 +144,24 @@ MonsterData::MonsterData() {
 void MonsterData::load(const Common::Path &name) {
 	File f(name);
 	synchronize(f);
+
+	if (g_vm->getLanguage() == Common::JA_JPN) {
+		// Unofficial Japanese translation: the names have their own file in
+		// xeen_ja.dat, since they don't fit the 15 bytes of the original
+		Common::Path namesPath(Common::String::format("monnames/%s",
+			name.baseName().c_str()));
+		Common::File fn;
+		if (g_vm->_files->_jaArchive && fn.open(namesPath, *g_vm->_files->_jaArchive)) {
+			for (uint idx = 0; idx < size() && fn.pos() < fn.size(); ++idx) {
+				Common::String jaName;
+				char c;
+				while (fn.pos() < fn.size() && (c = (char)fn.readByte()) != '\0')
+					jaName += c;
+				if (!jaName.empty())
+					(*this)[idx]._name = jaName;
+			}
+		}
+	}
 }
 
 void MonsterData::synchronize(Common::SeekableReadStream &s) {
