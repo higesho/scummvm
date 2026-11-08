@@ -424,6 +424,23 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 		0
 	},
 
+	// Unofficial Japanese fan translation (mm-ja) of the GOG English version,
+	// see the World of Xeen entry above
+	{
+		{
+			"swordsofxeen",
+			"Unofficial Japanese",
+			AD_ENTRY2s("swrd.cc", "0d51c3457070cc7d1a596da9241924a5", 13026924,
+					   "xeen_ja.dat", nullptr, AD_NO_SIZE),
+			Common::JA_JPN,
+			Common::kPlatformDOS,
+			ADGF_NO_FLAGS,
+			GUIO_XEEN
+		},
+		GType_Swords,
+		0
+	},
+
 	{ AD_TABLE_END_MARKER, 0, 0 }
 };
 
