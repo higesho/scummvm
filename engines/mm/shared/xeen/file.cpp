@@ -51,15 +51,15 @@ bool File::open(const Common::Path &filename) {
 		MM::Xeen::FileManager &fm = *engine->_files;
 
 		// Japanese translation: translated text files replace the originals
-		Common::Path jaPath = fm.getJaPath(filename);
-		if (!jaPath.empty() && Common::File::open(jaPath, *fm._jaArchive))
+		Common::SeekableReadStream *jaStream = fm.openJa(filename);
+		if (jaStream && Common::File::open(jaStream, filename.toString()))
 			return true;
 
 		if (!fm._currentSave || !Common::File::open(filename, *fm._currentSave)) {
 			if (!fm._currentArchive || !Common::File::open(filename, *fm._currentArchive)) {
 				// Could not find in current archive, so try intro.cc or in folder
-				jaPath = fm.getJaPath(filename, true);
-				if (!jaPath.empty() && Common::File::open(jaPath, *fm._jaArchive))
+				jaStream = fm.openJa(filename, true);
+				if (jaStream && Common::File::open(jaStream, filename.toString()))
 					return true;
 				if (!Common::File::open(filename))
 					error("Could not open file - %s", filename.toString(Common::Path::kNativeSeparator).c_str());
@@ -92,9 +92,9 @@ bool File::open(const Common::Path &filename, int ccMode) {
 	int oldNum = fm._ccNum;
 
 	fm.setGameCc(ccMode);
-	Common::Path jaPath = fm.getJaPath(filename);
-	if (!jaPath.empty())
-		File::open(jaPath, *fm._jaArchive);
+	Common::SeekableReadStream *jaStream = fm.openJa(filename);
+	if (jaStream)
+		Common::File::open(jaStream, filename.toString());
 	else if (File::exists(filename, *fm._currentArchive))
 		File::open(filename, *fm._currentArchive);
 	else

@@ -85,6 +85,12 @@ public:
 	Common::Path getJaPath(const Common::Path &filename, bool intro = false) const;
 
 	/**
+	 * Opens the Japanese replacement of a file, if there is one. Strings that
+	 * consist of the single byte 0x7F are taken from the original file
+	 */
+	Common::SeekableReadStream *openJa(const Common::Path &filename, bool intro = false) const;
+
+	/**
 	 * Constructor
 	 */
 	FileManager(XeenEngine *vm);

@@ -124,6 +124,61 @@ Common::Path FileManager::getJaPath(const Common::Path &filename, bool intro) co
 	return _jaArchive->hasFile(jaPath) ? jaPath : Common::Path();
 }
 
+static byte *readAll(Common::SeekableReadStream *s, uint32 &size) {
+	size = s->size();
+	byte *data = (byte *)malloc(size ? size : 1);
+	size = s->read(data, size);
+	delete s;
+	return data;
+}
+
+Common::SeekableReadStream *FileManager::openJa(const Common::Path &filename, bool intro) const {
+	Common::Path jaPath = getJaPath(filename, intro);
+	if (jaPath.empty())
+		return nullptr;
+	Common::SeekableReadStream *jaStream = _jaArchive->createReadStreamForMember(jaPath);
+	if (!jaStream)
+		return nullptr;
+
+	uint32 jaSize;
+	byte *jaData = readAll(jaStream, jaSize);
+	if (!memchr(jaData, 0x7f, jaSize))
+		return new Common::MemoryReadStream(jaData, jaSize, DisposeAfterUse::YES);
+
+	// Strings kept in English are only marked in xeen_ja.dat, so that it
+	// doesn't contain the original text: copy them from the original file
+	Common::Archive *src = intro ? _introCc : _currentArchive;
+	Common::SeekableReadStream *origStream = src ? src->createReadStreamForMember(filename) : nullptr;
+	uint32 origSize = 0;
+	byte *origData = origStream ? readAll(origStream, origSize) : nullptr;
+
+	Common::MemoryWriteStreamDynamic out(DisposeAfterUse::NO);
+	const byte *p = jaData, *end = jaData + jaSize;
+	const byte *op = origData, *oEnd = origData + origSize;
+	while (p < end) {
+		const byte *e = (const byte *)memchr(p, 0, end - p);
+		if (!e)
+			e = end;
+		const byte *oe = op < oEnd ? (const byte *)memchr(op, 0, oEnd - op) : nullptr;
+		if (!oe)
+			oe = oEnd;
+
+		if (e - p == 1 && *p == 0x7f)
+			out.write(op, oe - op);
+		else
+			out.write(p, e - p);
+		if (e < end)
+			out.writeByte(0);
+
+		p = e + 1;
+		op = (oe < oEnd) ? oe + 1 : oEnd;
+	}
+
+	free(jaData);
+	free(origData);
+	return new Common::MemoryReadStream(out.getData(), out.size(), DisposeAfterUse::YES);
+}
+
 void FileManager::load(Common::SeekableReadStream &stream) {
 	setGameCc(stream.readByte());
 }
