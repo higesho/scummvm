@@ -158,6 +158,20 @@ void Subtitles::show() {
 			_lineEnd = (_lineEnd == _lineSize) ? 0 : MIN(_lineEnd + step, _lineSize);
 			int count = MAX(_lineEnd - 40, 0);
 
+			if (g_vm->getLanguage() == Common::JA_JPN) {
+				// Keep both ends on Shift-JIS character boundaries
+				const byte *lineP = (const byte *)_lines[_lineNum].c_str();
+				int pos = 0, start = -1;
+				while (pos < _lineEnd) {
+					if (start < 0 && pos >= count)
+						start = pos;
+					byte b = lineP[pos];
+					pos += (((b >= 0x81 && b <= 0x9F) || (b >= 0xE0 && b <= 0xFC)) && lineP[pos + 1]) ? 2 : 1;
+				}
+				_lineEnd = MIN(pos, (int)_lineSize);
+				count = start < 0 ? _lineEnd : start;
+			}
+
 			// Get the portion of the line to display
 			char buffer[1000];
 			strncpy(buffer, _lines[_lineNum].c_str() + count, _lineEnd - count);

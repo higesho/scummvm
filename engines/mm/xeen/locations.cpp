@@ -2738,6 +2738,12 @@ bool LocationMessage::execute(int portrait, const Common::String &name, const Co
 			if (*msgP == ' ')
 				++wordCount;
 		}
+		if (g_vm->getLanguage() == Common::JA_JPN) {
+			// Japanese has no spaces between words: count about three
+			// characters as a word
+			int len = msgEnd ? (int)(msgEnd - msg.c_str()) : (int)msg.size();
+			wordCount = MAX(wordCount, len / 6);
+		}
 
 		_drawCtr2 = wordCount * 2;	// Set timeout
 		_townSprites[1].draw(0, 0, Common::Point(16, 16));

@@ -419,7 +419,10 @@ int CreateCharacterDialog::newCharDetails(Race race, Sex sex, int classId,
 	// If a selected class is provided, set the default skill for that class
 	if (classId != -1 && Res.NEW_CHAR_SKILLS[classId] != -1) {
 		const char *skillP = Res.SKILL_NAMES[Res.NEW_CHAR_SKILLS[classId]];
-		skillStr = Common::String(skillP, skillP + Res.NEW_CHAR_SKILLS_LEN[classId]);
+		if (g_vm->getLanguage() == Common::JA_JPN)
+			skillStr = Common::String(skillP);
+		else
+			skillStr = Common::String(skillP, skillP + Res.NEW_CHAR_SKILLS_LEN[classId]);
 	}
 
 	// If a class is provided, set the class name
@@ -430,7 +433,10 @@ int CreateCharacterDialog::newCharDetails(Race race, Sex sex, int classId,
 	// Set up default skill for the race, if any
 	if (Res.NEW_CHAR_RACE_SKILLS[race] != -1) {
 		const char *skillP = Res.SKILL_NAMES[Res.NEW_CHAR_RACE_SKILLS[race]];
-		raceSkillStr = Common::String(skillP + Res.NEW_CHAR_SKILLS_OFFSET[race]);
+		if (g_vm->getLanguage() == Common::JA_JPN)
+			raceSkillStr = Common::String(skillP);
+		else
+			raceSkillStr = Common::String(skillP + Res.NEW_CHAR_SKILLS_OFFSET[race]);
 	}
 
 	// Set up color to use for each skill string to be displayed, based

@@ -124,7 +124,7 @@ void Quests::execute() {
 					if (multiFlag) {
 						lines[count++] = Common::String::format("%d %s%c",
 							party._questItems[idx], questItemNames[idx],
-							party._questItems[idx] == 1 ? ' ' : 's');
+							(party._questItems[idx] == 1 || g_vm->getLanguage() == Common::JA_JPN) ? ' ' : 's');
 					} else {
 						lines[count++] = questItemNames[idx];
 					}

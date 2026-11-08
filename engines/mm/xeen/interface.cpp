@@ -1579,7 +1579,9 @@ void Interface::assembleBorder() {
 	// Draw direction character if direction sense is active
 	if (_vm->_party->checkSkill(DIRECTION_SENSE) && !_vm->_noDirectionSense) {
 		const char *dirText = Res.DIRECTION_TEXT_UPPER[_vm->_party->_mazeDirection];
-		Common::String msg = Common::String::format("\x2\f08\x3""c\v139\t116%c\fd\x1", *dirText);
+		Common::String msg = (g_vm->getLanguage() == Common::JA_JPN) ?
+			Common::String::format("\x2\f08\x3""c\v139\t116%s\fd\x1", dirText) :
+			Common::String::format("\x2\f08\x3""c\v139\t116%c\fd\x1", *dirText);
 		windows[0].writeString(msg);
 	}
 
