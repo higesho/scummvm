@@ -203,7 +203,8 @@ void SdlGraphicsManager::initSizeHint(const Graphics::ModeList &modes) {
 		// instead of checking the dimensions here like this, since not all
 		// 320x200/640x400 uses are with non-square pixels (e.g. DreamWeb).
 		if (ConfMan.getBool("aspect_ratio")) {
-			if ((width == 320 && height == 200) || (width == 640 && height == 400)) {
+			// 960x600 は Might and Magic（Xeen）の非公式日本語版が 320x200 を 3 倍にしたもの
+			if ((width == 320 && height == 200) || (width == 640 && height == 400) || (width == 960 && height == 600)) {
 				height = real2Aspect(height);
 			}
 		}

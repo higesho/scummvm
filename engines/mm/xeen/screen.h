@@ -35,6 +35,9 @@ namespace Xeen {
 #define PALETTE_COUNT 256
 #define PALETTE_SIZE (256 * 3)
 
+// 非公式日本語版: 日本語の字を東雲フォント 12×12 で描き直せるように、画面を 3 倍にして送る
+#define JA_SCALE 3
+
 class XeenEngine;
 
 class Screen : public Graphics::Screen {
@@ -45,6 +48,34 @@ private:
 	XSurface _pages[2];
 	XSurface _savedScreens[10];
 	bool _fadeIn;
+
+	/**
+	 * 非公式日本語版: 画面に描いた日本語の字
+	 */
+	struct JaChar {
+		int16 _x, _y;	// 8×8 のマスの左上（画面の座標）
+		uint16 _cell;	// 字の表の番号（JIS X 0208 の区 × 94 ＋ 点）
+		byte _color;	// 字の色
+	};
+	bool _jaHiRes;			// 画面を JA_SCALE 倍にして送る
+	bool _jaShinonome;		// 日本語の字を東雲フォントで描き直す
+	Common::Array<JaChar> _jaChars;
+	Graphics::ManagedSurface _jaSurface;	// JA_SCALE 倍にした画面
+
+	/**
+	 * 日本語: 画面の一部を JA_SCALE 倍にして写す
+	 */
+	void jaScaleRect(const Common::Rect &r);
+
+	/**
+	 * 日本語: 8×8 の字がまだ画面に残っていれば true
+	 */
+	bool jaCharVisible(const JaChar &jc) const;
+
+	/**
+	 * 日本語: 広げた画面に、字を東雲フォントで描き直す
+	 */
+	void jaDrawChar(const JaChar &jc);
 
 	/**
 	 * Mark the entire screen for drawing
@@ -68,6 +99,31 @@ public:
 	void addDirtyRect(const Common::Rect &r) override {
 		Graphics::Screen::addDirtyRect(r);
 	}
+
+	/**
+	 * 変わった所を実際の画面に送る
+	 */
+	void update() override;
+
+	/**
+	 * 日本語: JA_SCALE 倍で描く準備をする。initGraphics の前に呼ぶ
+	 */
+	void setupJa();
+
+	/**
+	 * 日本語: 画面を JA_SCALE 倍にして送っていれば true
+	 */
+	bool isJaHiRes() const { return _jaHiRes; }
+
+	/**
+	 * 日本語: 8×8 で描いた字の位置を覚える
+	 */
+	void addJaChar(int x, int y, int cell, byte color);
+
+	/**
+	 * 日本語: 東雲フォントと美咲フォントを切り替える
+	 */
+	void toggleJaFont();
 
 	/**
 	 * Load a palette resource into the temporary palette

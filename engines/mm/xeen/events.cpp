@@ -44,7 +44,19 @@ void EventsManager::setCursor(int cursorId) {
 	XSurface cursor;
 	_sprites.draw(cursor, cursorId, Common::Point(0, 0), SPRFLAG_RESIZE);
 
-	CursorMan.replaceCursor(cursor, 0, 0, 0);
+	if (_vm->_screen && _vm->_screen->isJaHiRes()) {
+		// 日本語: 画面を 3 倍にして送っているので、カーソルも 3 倍にする
+		Graphics::ManagedSurface big(cursor.w * JA_SCALE, cursor.h * JA_SCALE);
+		for (int y = 0; y < big.h; ++y) {
+			const byte *srcP = (const byte *)cursor.getBasePtr(0, y / JA_SCALE);
+			byte *destP = (byte *)big.getBasePtr(0, y);
+			for (int x = 0; x < big.w; ++x)
+				destP[x] = srcP[x / JA_SCALE];
+		}
+		CursorMan.replaceCursor(big, 0, 0, 0);
+	} else {
+		CursorMan.replaceCursor(cursor, 0, 0, 0);
+	}
 	showCursor();
 }
 
@@ -84,11 +96,21 @@ void EventsManager::pollEvents() {
 		case Common::EVENT_RETURN_TO_LAUNCHER:
 			return;
 		case Common::EVENT_KEYDOWN:
+			if (event.kbd.keycode == Common::KEYCODE_F11 && _vm->_screen->isJaHiRes()) {
+				// 日本語: F11 で字の形（東雲・美咲）を切り替える。このキーはゲームには渡さない
+				_vm->_screen->toggleJaFont();
+				break;
+			}
 			if (!isModifierKey(event.kbd.keycode))
 				addEvent(event.kbd);
 			break;
 		case Common::EVENT_MOUSEMOVE:
 			_mousePos = event.mouse;
+			if (_vm->_screen->isJaHiRes()) {
+				// 日本語: 画面を 3 倍にして送っているので、ゲームの座標に戻す
+				_mousePos.x /= JA_SCALE;
+				_mousePos.y /= JA_SCALE;
+			}
 #ifdef USE_TTS
 			_vm->_mouseMoved = true;
 #endif

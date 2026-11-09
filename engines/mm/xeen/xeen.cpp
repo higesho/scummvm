@@ -119,7 +119,13 @@ bool XeenEngine::initialize() {
 	_windows = new Windows();
 
 	// Set graphics mode
-	initGraphics(SCREEN_WIDTH, SCREEN_HEIGHT);
+	if (getLanguage() == Common::JA_JPN) {
+		// 非公式日本語版: 日本語の字を東雲フォントで描き直せるように、画面を 3 倍にして送る
+		_screen->setupJa();
+		initGraphics(SCREEN_WIDTH * JA_SCALE, SCREEN_HEIGHT * JA_SCALE);
+	} else {
+		initGraphics(SCREEN_WIDTH, SCREEN_HEIGHT);
+	}
 
 	// Setup mixer
 	syncSoundSettings();
