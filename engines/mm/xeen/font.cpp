@@ -22,6 +22,7 @@
 #include "common/endian.h"
 #include "mm/xeen/font.h"
 #include "mm/xeen/resources.h"
+#include "mm/xeen/screen.h"
 #include "mm/xeen/xeen.h"
 
 namespace MM {
@@ -40,6 +41,7 @@ bool FontData::_fontReduced;
 Justify FontData::_fontJustify;
 Graphics::Big5Font *FontData::_big5Font;
 const byte *FontData::_jaFont;
+const byte *FontData::_jaFont12;
 	
 FontSurface::FontSurface() : XSurface(), _msgWraps(false), _displayString(nullptr),
 		_writePos(*FontData::_fontWritePos) {
@@ -671,6 +673,10 @@ void FontSurface::writeSjisChar(uint16_t c, const Common::Rect &clipRect) {
 			}
 		}
 	}
+
+	// 東雲フォントで描き直せるように、字の位置を画面に知らせる（窓は画面と同じ画素を使う）
+	if (cell >= 0 && g_vm->_screen && getPixels() == g_vm->_screen->getPixels())
+		g_vm->_screen->addJaChar(_writePos.x, _writePos.y, cell, _textColors[2]);
 
 	addDirtyRect(Common::Rect(_writePos.x, _writePos.y, _writePos.x + FONT_WIDTH,
 		_writePos.y + FONT_HEIGHT));

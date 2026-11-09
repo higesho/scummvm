@@ -46,6 +46,9 @@ struct FontData {
 	// Unofficial Japanese translation: 8x8 glyphs of JIS X 0208, 94 x 94
 	// cells of 8 bytes (one byte per row, high bit on the left)
 	static const byte *_jaFont;
+	// 非公式日本語版: 東雲フォント 12×12 の字（並びは _jaFont と同じ、1 字 24 バイト、1 行 2 バイト）。
+	// Screen が画面を 3 倍に広げて、8×8 の字をこれで描き直す。ファイルがなければ nullptr
+	static const byte *_jaFont12;
 };
 
 class FontSurface: public Shared::Xeen::XSurface, public FontData {

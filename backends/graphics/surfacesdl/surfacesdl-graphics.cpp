@@ -929,7 +929,8 @@ void SurfaceSdlGraphicsManager::setupHardwareSize() {
 	_videoMode.overlayWidth = _videoMode.screenWidth * _videoMode.scaleFactor;
 	_videoMode.overlayHeight = _videoMode.screenHeight * _videoMode.scaleFactor;
 
-	if (_videoMode.screenHeight != 200 && _videoMode.screenHeight != 400)
+	// 600 は Might and Magic（Xeen）の非公式日本語版が 320x200 を 3 倍にしたもの
+	if (_videoMode.screenHeight != 200 && _videoMode.screenHeight != 400 && _videoMode.screenHeight != 600)
 		_videoMode.aspectRatioCorrection = false;
 
 	_videoMode.hardwareWidth = _videoMode.screenWidth * _videoMode.scaleFactor;

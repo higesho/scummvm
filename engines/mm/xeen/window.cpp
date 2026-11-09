@@ -32,6 +32,7 @@ Windows::Windows() {
 	f.read(data, f.size());
 	_fontData = data;
 	_jaFont = nullptr;
+	_jaFont12 = nullptr;
 	_fontWritePos = new Common::Point();
 
 	Common::fill(&_textColors[0], &_textColors[4], 0);
@@ -103,6 +104,14 @@ Windows::Windows() {
 		byte *jaData = new byte[fj.size()];
 		fj.read(jaData, fj.size());
 		_jaFont = jaData;
+
+		// 東雲フォント 12×12（画面を 3 倍に広げて描くときに使う）
+		if (File::exists("font_ja12.bin")) {
+			File fj12("font_ja12.bin");
+			byte *ja12Data = new byte[fj12.size()];
+			fj12.read(ja12Data, fj12.size());
+			_jaFont12 = ja12Data;
+		}
 	}	
 
 }
@@ -111,6 +120,8 @@ Windows::~Windows() {
 	delete[] _fontData;
 	delete[] _jaFont;
 	_jaFont = nullptr;
+	delete[] _jaFont12;
+	_jaFont12 = nullptr;
 	delete _fontWritePos;
 }
 

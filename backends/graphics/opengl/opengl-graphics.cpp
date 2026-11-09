@@ -1840,7 +1840,9 @@ bool OpenGLGraphicsManager::gameNeedsAspectRatioCorrection() const {
 		// In case we enable aspect ratio correction we force a 4/3 ratio.
 		// But just for 320x200, 640x400, 640x350 (16 color EGA) and Hercules games, since other
 		// games do not need this.
+		// 960x600 は Might and Magic（Xeen）の非公式日本語版が 320x200 を 3 倍にしたもの
 		return (width == 320 && height == 200) || (width == 640 && height == 400) ||
+			   (width == 960 && height == 600) ||
 			   (width == 640 && height == 350) ||
 		       (width == 720 && height == 348) || (width == 720 && height == 350);
 	}
