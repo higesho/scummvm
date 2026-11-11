@@ -21,7 +21,11 @@
 
 #include "ultima/ultima8/ultima8.h"
 
+#include "common/config-manager.h"
 #include "common/file.h"
+#include "common/fs.h"
+#include "common/hashmap.h"
+#include "common/memstream.h"
 #include "common/rational.h"
 #include "common/translation.h"
 #include "common/compression/unzip.h"
@@ -114,6 +118,135 @@ struct ProcessLoader {
 
 inline bool HasPreventSaveFlag(const Gump *g) { return g->hasFlags(Gump::FLAG_PREVENT_SAVE); }
 
+// Unofficial Japanese fan translation (ultima-ja).
+// The game folder holds only u8jp.dlt; the English files come from the extra path.
+// The translated files are built in memory from the English files and the delta,
+// and served ahead of everything else, so no game file is written or copied.
+class U8JPArchive : public Common::Archive {
+public:
+	Common::HashMap<Common::Path, Common::Array<byte>, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> _files;
+
+	bool hasFile(const Common::Path &path) const override {
+		return _files.contains(path);
+	}
+	int listMembers(Common::ArchiveMemberList &list) const override {
+		for (const auto &f : _files)
+			list.push_back(Common::ArchiveMemberPtr(new Common::GenericArchiveMember(f._key, *this)));
+		return _files.size();
+	}
+	const Common::ArchiveMemberPtr getMember(const Common::Path &path) const override {
+		if (!hasFile(path))
+			return Common::ArchiveMemberPtr();
+		return Common::ArchiveMemberPtr(new Common::GenericArchiveMember(path, *this));
+	}
+	Common::SeekableReadStream *createReadStreamForMember(const Common::Path &path) const override {
+		if (!_files.contains(path))
+			return nullptr;
+		const Common::Array<byte> &d = _files.getVal(path);
+		return new Common::MemoryReadStream(d.data(), d.size(), DisposeAfterUse::NO);
+	}
+};
+
+static uint32 u8jpCrc32(const byte *d, uint32 n) {
+	static uint32 table[256];
+	static bool init = false;
+	if (!init) {
+		for (uint32 i = 0; i < 256; i++) {
+			uint32 c = i;
+			for (int k = 0; k < 8; k++)
+				c = (c & 1) ? 0xEDB88320u ^ (c >> 1) : c >> 1;
+			table[i] = c;
+		}
+		init = true;
+	}
+	uint32 c = 0xFFFFFFFFu;
+	for (uint32 i = 0; i < n; i++)
+		c = table[(c ^ d[i]) & 0xFF] ^ (c >> 8);
+	return c ^ 0xFFFFFFFFu;
+}
+
+// Returns false (after telling the user) when the delta cannot be applied.
+static bool loadU8JPDelta() {
+	Common::File df;
+	if (!df.open("u8jp.dlt"))
+		return true;	// not the Japanese fan translation
+
+	// The English files are in the extra path, which ScummVM searches only one level deep.
+	if (ConfMan.hasKey("extrapath"))
+		SearchMan.addDirectory("u8jp_english", Common::FSNode(ConfMan.getPath("extrapath")), 0, 4);
+	uint32 dsize = df.size();
+	Common::Array<byte> data(dsize);
+	if (dsize < 12 || df.read(data.data(), dsize) != dsize || memcmp(data.data(), "U8JPDLT1", 8) != 0) {
+		GUIErrorMessage("u8jp.dlt is broken. Please extract the Japanese patch again.");
+		return false;
+	}
+	const byte *p = data.data() + 8, *end = data.data() + dsize;
+	bool ok = true;
+	auto u8 = [&]() -> uint32 { if (end - p < 1) { ok = false; return 0; } return *p++; };
+	auto u16 = [&]() -> uint32 { if (end - p < 2) { ok = false; return 0; } uint32 v = READ_LE_UINT16(p); p += 2; return v; };
+	auto u32 = [&]() -> uint32 { if (end - p < 4) { ok = false; return 0; } uint32 v = READ_LE_UINT32(p); p += 4; return v; };
+	auto path = [&]() -> Common::String {
+		uint32 n = u16();
+		if (!ok || (uint32)(end - p) < n) { ok = false; return Common::String(); }
+		Common::String s((const char *)p, n);
+		p += n;
+		return s;
+	};
+
+	U8JPArchive *arc = new U8JPArchive();
+	uint32 nfiles = u32();
+	for (uint32 i = 0; i < nfiles && ok; i++) {
+		Common::String dst = path(), src = path();
+		uint32 srcSize = u32(), srcCrc = u32(), dstSize = u32(), dstCrc = u32(), opCount = u32();
+		if (!ok)
+			break;
+
+		Common::File sf;
+		if (!sf.open(Common::Path(src))) {
+			GUIErrorMessageFormat("Cannot find the English file %s.\nPlease check the ENGLISH folder of the game.", src.c_str());
+			delete arc;
+			return false;
+		}
+		Common::Array<byte> s(sf.size());
+		if (sf.read(s.data(), s.size()) != s.size() || s.size() != srcSize || u8jpCrc32(s.data(), s.size()) != srcCrc) {
+			GUIErrorMessageFormat("The English file %s is not the GOG.com version.\nPlease repair the game files with GOG Galaxy.", src.c_str());
+			delete arc;
+			return false;
+		}
+
+		Common::Array<byte> out;
+		out.reserve(dstSize);
+		for (uint32 k = 0; k < opCount && ok; k++) {
+			if (u8() == 0) {
+				uint32 off = u32(), len = u32();
+				if (!ok || (uint64)off + len > s.size()) { ok = false; break; }
+				uint32 at = out.size();
+				out.resize(at + len);
+				memcpy(out.data() + at, s.data() + off, len);
+			} else {
+				uint32 len = u32();
+				if (!ok || (uint32)(end - p) < len) { ok = false; break; }
+				uint32 at = out.size();
+				out.resize(at + len);
+				memcpy(out.data() + at, p, len);
+				p += len;
+			}
+		}
+		if (!ok || out.size() != dstSize || u8jpCrc32(out.data(), out.size()) != dstCrc) {
+			ok = false;
+			break;
+		}
+		arc->_files[Common::Path(dst)] = out;
+	}
+	if (!ok) {
+		GUIErrorMessage("u8jp.dlt is broken. Please extract the Japanese patch again.");
+		delete arc;
+		return false;
+	}
+	SearchMan.add("u8jp", arc, 100);
+	return true;
+}
+
 Ultima8Engine *Ultima8Engine::_instance = nullptr;
 
 Ultima8Engine::Ultima8Engine(OSystem *syst, const Ultima::UltimaGameDescription *gameDesc) :
@@ -180,6 +313,9 @@ Common::Error Ultima8Engine::initialize() {
 		return Common::kPathDoesNotExist;
 	}
 	SearchMan.add("ultima8.dat", archive);
+
+	if (!loadU8JPDelta())
+		return Common::kNoGameDataFoundError;
 
 	setDebugger(new Debugger());
 

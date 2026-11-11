@@ -394,15 +394,14 @@ static const UltimaGameDescription GAME_DESCRIPTIONS[] = {
 		0
 	},
 
-	// Unofficial Japanese fan translation (ultima-ja), built from the English version.
-	// The files change with every translation update, so no MD5 or size is checked.
+	// Unofficial Japanese fan translation (ultima-ja). The game folder holds only u8jp.dlt,
+	// a delta that the engine applies in memory to the English files found in the extra path.
+	// The delta changes with every translation update, so no MD5 or size is checked.
 	{
 		{
 			"ultima8",
 			"Unofficial Japanese",
-			AD_ENTRY3s("usecode/jusecode.flx", nullptr, AD_NO_SIZE,
-					   "static/u8shapes.flx", nullptr, AD_NO_SIZE,
-					   "static/u8fonts.flx", nullptr, AD_NO_SIZE),
+			AD_ENTRY1s("u8jp.dlt", nullptr, AD_NO_SIZE),
 			Common::JA_JPN,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
