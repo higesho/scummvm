@@ -449,39 +449,60 @@ bool SoundDriverMT32::cmdChangeFrequency(const byte *&srcP, byte param) {
 }
 
 void SoundDriverMT32::sysExMessage(const byte *&data) {
-	byte   sysExMessage[270];
-	uint16 sysExPos      = 0;
-	byte   sysExByte     = 0;
-	uint16 sysExChecksum = 0;
-
-	memset(&sysExMessage, 0, sizeof(sysExMessage));
-
-	sysExMessage[0] = 0x41; // Roland
-	sysExMessage[1] = 0x10; // Device ID
-	sysExMessage[2] = 0x16; // Model MT32
-	sysExMessage[3] = 0x12; // Command DT1
-
-	sysExPos      = 4;
-	sysExChecksum = 0;
+	// The game's data holds the 3 address bytes followed by the data bytes,
+	// terminated by 0xF7. Some of them (the timbre data in rolmus) are longer
+	// than a backend can send in one SysEx (the Windows driver accepts at most
+	// 264 bytes), so long ones are split into several DT1 messages with the
+	// address moved forward. The MT-32 ends up with the same memory contents.
+	byte body[512];
+	uint16 bodyLen = 0;
 	while (1) {
-		sysExByte = *data++;
+		byte sysExByte = *data++;
 		if (sysExByte == 0xF7)
 			break; // Message done
 
-		// if we need bigger buffer then buffer in MidiDriver_ALSA::sysEx should also be increased!
-		assert(sysExPos < sizeof(sysExMessage));
-		sysExMessage[sysExPos++] = sysExByte;
-		sysExChecksum -= sysExByte;
+		assert(bodyLen < sizeof(body));
+		body[bodyLen++] = sysExByte;
 	}
+	if (bodyLen < 3)
+		return;
 
-	// Calculate checksum
-	assert(sysExPos < sizeof(sysExMessage));
-	sysExMessage[sysExPos++] = sysExChecksum & 0x7f;
+	// Header (4) + address (3) + data + checksum (1) must stay within 264 bytes
+	const uint16 MAX_DATA = 264 - 4 - 3 - 1;
+	uint32 address = (body[0] << 14) | (body[1] << 7) | body[2];
+	uint16 pos = 3;
+	do {
+		uint16 count = MIN<uint16>(bodyLen - pos, MAX_DATA);
+		byte sysExMessage[264];
+		uint16 sysExPos = 0;
+		uint16 sysExChecksum = 0;
 
-	debugC(3, "sending sysex message, size %d", sysExPos);
+		sysExMessage[sysExPos++] = 0x41; // Roland
+		sysExMessage[sysExPos++] = 0x10; // Device ID
+		sysExMessage[sysExPos++] = 0x16; // Model MT32
+		sysExMessage[sysExPos++] = 0x12; // Command DT1
 
-	// Send SysEx message
-	_midiDriver->sysEx(sysExMessage, sysExPos);
+		const byte addr[3] = { (byte)((address >> 14) & 0x7f), (byte)((address >> 7) & 0x7f), (byte)(address & 0x7f) };
+		for (int i = 0; i < 3; ++i) {
+			sysExMessage[sysExPos++] = addr[i];
+			sysExChecksum -= addr[i];
+		}
+		for (uint16 i = 0; i < count; ++i) {
+			sysExMessage[sysExPos++] = body[pos + i];
+			sysExChecksum -= body[pos + i];
+		}
+
+		// Calculate checksum
+		sysExMessage[sysExPos++] = sysExChecksum & 0x7f;
+
+		debugC(3, "sending sysex message, size %d", sysExPos);
+
+		// Send SysEx message
+		_midiDriver->sysEx(sysExMessage, sysExPos);
+
+		pos += count;
+		address += count;
+	} while (pos < bodyLen);
 }
 
 } // namespace Xeen
